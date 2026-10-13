@@ -1,0 +1,700 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f1226">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="AI 사주">
+<meta property="og:title" content="AI 사주 체험">
+<meta property="og:description" content="생년월일만 입력하면 AI가 사주 한 장을 뽑아드려요. 재미로만 즐겨주세요!">
+<meta property="og:type" content="website">
+<title>AI 사주 체험</title>
+<style>
+  :root{
+    --bg1:#0f1226; --card:#ffffff10; --line:#ffffff22;
+    --text:#eef0ff; --muted:#9aa0c8; --accent:#a78bfa; --accent2:#f5c76b;
+    --wood:#6ee7a8; --fire:#ff7b7b; --earth:#f5c76b; --metal:#e5e7ff; --water:#7cc7ff;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%}
+  body{
+    display:flex;flex-direction:column;height:100dvh;overflow:hidden;
+    font-family:'Apple SD Gothic Neo','Malgun Gothic','Noto Sans KR',system-ui,sans-serif;
+    background:
+      radial-gradient(1200px 700px at 50% -10%,#2a2f66 0%,var(--bg1) 60%);
+    color:var(--text);-webkit-font-smoothing:antialiased;
+  }
+  [hidden]{display:none!important}
+  #print-root{display:none}
+
+  /* ---------- 상단 안내 문구 ---------- */
+  .warn{
+    flex:none;text-align:center;padding:9px 14px;padding-top:max(9px,env(safe-area-inset-top));
+    font-size:13.5px;font-weight:700;color:#ffe29a;letter-spacing:-.2px;
+    background:linear-gradient(90deg,#3a2d0f55,#5a470f66,#3a2d0f55);
+    border-bottom:1px solid #f5c76b55;
+  }
+  .warn small{display:block;font-weight:400;font-size:11px;color:#d9c48a;margin-top:1px}
+
+  /* ---------- 셸(PC: 좌우 장식 + 가운데 앱) ---------- */
+  #shell{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr)}
+  #main{position:relative;min-height:0;overflow-y:auto;overflow-x:hidden}
+  .deco{display:none;flex-direction:column;align-items:center;justify-content:center;gap:26px;padding:18px;overflow:hidden;position:relative}
+  @media (min-width:1000px){
+    #shell{grid-template-columns:minmax(0,1fr) minmax(0,600px) minmax(0,1fr)}
+    .deco{display:flex}
+    #main{border-left:1px solid #ffffff12;border-right:1px solid #ffffff12}
+  }
+
+  .ring{width:min(78%,300px);animation:spin 90s linear infinite;filter:drop-shadow(0 0 18px #a78bfa66)}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .chips{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+  .chip{
+    width:46px;height:46px;border-radius:50%;display:grid;place-items:center;
+    font-family:'Noto Serif CJK KR','Noto Serif KR','Batang',serif;font-size:22px;font-weight:700;
+    border:1.5px solid currentColor;background:#ffffff08;animation:float 4s ease-in-out infinite;
+    box-shadow:0 0 16px currentColor inset, 0 0 14px #0006;
+  }
+  .chip:nth-child(2){animation-delay:.5s}.chip:nth-child(3){animation-delay:1s}
+  .chip:nth-child(4){animation-delay:1.5s}.chip:nth-child(5){animation-delay:2s}
+  @keyframes float{50%{transform:translateY(-8px)}}
+  .cap{font-size:12px;letter-spacing:6px;color:var(--muted);text-align:center}
+  .vt{
+    writing-mode:vertical-rl;font-family:'Noto Serif CJK KR','Noto Serif KR','Batang',serif;
+    font-size:54px;font-weight:700;letter-spacing:.25em;line-height:1;
+    background:linear-gradient(180deg,#ffe29a,#a78bfa);-webkit-background-clip:text;background-clip:text;color:transparent;
+    opacity:.9;
+  }
+  .moon{width:min(62%,220px);filter:drop-shadow(0 0 30px #ffe29a88)}
+  .cloud{position:absolute;height:26px;border-radius:30px;background:#ffffff14;filter:blur(2px);animation:drift 28s linear infinite}
+  .cloud.c1{width:140px;top:18%;left:-160px}
+  .cloud.c2{width:100px;top:56%;left:-120px;animation-duration:38s;animation-delay:-14s;height:20px}
+  .cloud.c3{width:170px;top:80%;left:-200px;animation-duration:46s;animation-delay:-30s}
+  @keyframes drift{to{transform:translateX(900px)}}
+  .star{position:absolute;width:3px;height:3px;border-radius:50%;background:#fff;animation:tw 3s ease-in-out infinite}
+  @keyframes tw{50%{opacity:.15}}
+  .phrase{
+    min-height:92px;width:min(86%,270px);text-align:center;padding:14px 12px;border-radius:16px;
+    border:1px solid var(--line);background:#ffffff0c;transition:opacity .5s;
+  }
+  .phrase small{display:block;color:var(--accent2);font-size:11px;letter-spacing:3px;margin-bottom:6px}
+  .phrase div{font-size:16px;line-height:1.5;word-break:keep-all}
+  .phrase.out{opacity:0}
+
+  /* ---------- 입력 화면 ---------- */
+  #screen-input{min-height:100%;display:flex;align-items:center;justify-content:center;padding:20px 18px 28px}
+  .panel{width:100%;max-width:520px;text-align:center}
+  .logo{
+    width:60px;height:60px;margin:0 auto 14px;border-radius:20px;
+    background:linear-gradient(135deg,var(--accent),#6ee7f9);
+    display:grid;place-items:center;font-size:28px;box-shadow:0 10px 40px #a78bfa66;
+  }
+  h1{margin:0 0 8px;font-size:30px;letter-spacing:-.5px}
+  .sub{color:var(--muted);margin:0 0 22px;font-size:15px;line-height:1.5}
+  .form{background:var(--card);border:1px solid var(--line);border-radius:24px;padding:22px;text-align:left;backdrop-filter:blur(8px)}
+  label{display:block;font-size:13px;color:var(--muted);margin:0 0 8px 2px}
+  .field{margin-bottom:18px}
+  input[type=date],select{
+    width:100%;padding:14px 16px;font-size:17px;color:var(--text);
+    background:#0b0d1f;border:1px solid var(--line);border-radius:14px;outline:none;font-family:inherit;
+    color-scheme:dark;min-height:52px;
+  }
+  input:focus,select:focus{border-color:var(--accent);box-shadow:0 0 0 3px #a78bfa33}
+  .seg{display:flex;gap:10px}
+  .seg button{
+    flex:1;padding:14px;font-size:17px;font-family:inherit;color:var(--muted);min-height:52px;
+    background:#0b0d1f;border:1px solid var(--line);border-radius:14px;cursor:pointer;transition:.15s
+  }
+  .seg button.on{color:#fff;background:linear-gradient(135deg,#7c5cf0,#a78bfa);border-color:transparent;font-weight:700}
+  .go{
+    width:100%;margin-top:6px;padding:16px;font-size:18px;font-weight:700;font-family:inherit;color:#1a1530;
+    background:linear-gradient(135deg,var(--accent2),#ffe29a);border:0;border-radius:16px;cursor:pointer;
+    box-shadow:0 8px 28px #f5c76b44;transition:transform .1s
+  }
+  .go:active{transform:scale(.98)}
+  .err{color:#ff8fa3;font-size:13px;min-height:18px;margin:-6px 0 8px 2px}
+  .note{margin-top:14px;font-size:12px;color:#7d83ad}
+
+  /* ---------- 채팅 화면 ---------- */
+  #screen-chat{height:100%;display:flex;flex-direction:column}
+  .chat-head{
+    flex:none;display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--line);
+    background:#0f1226cc;backdrop-filter:blur(10px)
+  }
+  .avatar{width:38px;height:38px;border-radius:12px;background:linear-gradient(135deg,var(--accent),#6ee7f9);display:grid;place-items:center;font-size:19px;flex:none}
+  .chat-head b{display:block;font-size:16px}
+  .chat-head span{font-size:12px;color:#7ee7a8}
+  #chat{flex:1;overflow-y:auto;padding:16px 12px 40px;width:100%;margin:0 auto}
+  .row{display:flex;gap:10px;margin-bottom:14px;animation:rise .25s ease}
+  .row.me{justify-content:flex-end}
+  @keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  .bubble{
+    max-width:86%;padding:12px 15px;border-radius:18px;font-size:16px;line-height:1.65;white-space:pre-wrap;word-break:keep-all;
+    background:#ffffff14;border:1px solid var(--line);border-top-left-radius:6px
+  }
+  .me .bubble{background:linear-gradient(135deg,#7c5cf0,#a78bfa);border:0;border-radius:18px;border-top-right-radius:6px;color:#fff}
+  .dots{display:inline-flex;gap:5px;padding:4px 2px}
+  .dots i{width:7px;height:7px;border-radius:50%;background:var(--muted);animation:b 1s infinite}
+  .dots i:nth-child(2){animation-delay:.15s}.dots i:nth-child(3){animation-delay:.3s}
+  @keyframes b{0%,60%,100%{transform:none;opacity:.4}30%{transform:translateY(-5px);opacity:1}}
+  .cursor::after{content:'▍';color:var(--accent);animation:blink .8s infinite;margin-left:1px}
+  @keyframes blink{50%{opacity:0}}
+  .mini{display:flex;gap:8px;margin-top:10px}
+  .mini div{flex:1;text-align:center;background:#0b0d1f;border:1px solid var(--line);border-radius:12px;padding:8px 4px}
+  .mini small{display:block;color:var(--muted);font-size:11px;margin-bottom:2px}
+  .mini .h{font-family:'Noto Serif CJK KR','Noto Serif KR','Batang',serif;font-size:24px;line-height:1.2}
+  .mini .k{font-size:12px;color:var(--accent2)}
+
+  /* ---------- 결과(이미지) ---------- */
+  .result-box{display:flex;flex-direction:column;align-items:center;gap:14px;width:100%}
+  .result-img{width:min(100%,340px);border-radius:18px;box-shadow:0 14px 50px #000a;display:block;-webkit-touch-callout:default;user-select:auto}
+  .actions{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;width:100%}
+  .btn{padding:14px 18px;font-size:16px;font-family:inherit;font-weight:700;border-radius:14px;border:0;cursor:pointer;min-height:50px;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:6px}
+  .btn-main{background:linear-gradient(135deg,var(--accent2),#ffe29a);color:#1a1530;flex:1 1 140px}
+  .btn-sub{background:linear-gradient(135deg,#7c5cf0,#a78bfa);color:#fff;flex:1 1 140px}
+  .btn-ghost{background:#ffffff18;color:var(--text);border:1px solid var(--line)!important;flex:1 1 100px}
+  .desk-only{display:none!important}
+  body.desk .desk-only{display:inline-flex!important}
+  body.desk .opts.desk-only{display:flex!important}
+  .opts{font-size:13px;color:var(--muted);gap:14px;align-items:center;flex-wrap:wrap;justify-content:center}
+  .opts select{width:auto;padding:6px 10px;font-size:13px;border-radius:10px;min-height:0}
+  .hint{font-size:12px;color:#7d83ad;text-align:center;line-height:1.5}
+
+  /* ---------- 모달/토스트 ---------- */
+  #modal{position:fixed;inset:0;z-index:50;background:#000c;display:flex;align-items:center;justify-content:center;padding:18px;overflow:auto}
+  #modal .sheet{background:#161a38;border:1px solid var(--line);border-radius:22px;padding:16px;max-width:380px;width:100%;text-align:center}
+  #modal img{width:100%;border-radius:14px;display:block;margin-bottom:12px}
+  #modal p{margin:0 0 12px;font-size:14px;color:#ffe29a;line-height:1.5}
+  #modal .actions{margin-top:4px}
+  #toast{position:fixed;left:50%;bottom:calc(28px + env(safe-area-inset-bottom));transform:translateX(-50%);background:#000d;color:#fff;padding:11px 18px;border-radius:30px;font-size:14px;z-index:60;opacity:0;pointer-events:none;transition:opacity .25s}
+  #toast.on{opacity:1}
+
+  /* ---------- 영수증(프린터 출력용) ---------- */
+  .receipt{
+    background:#fff;color:#000;
+    font-family:'Apple SD Gothic Neo','Malgun Gothic','Noto Sans KR',sans-serif;
+    font-size:12px;line-height:1.5;padding:4mm 2mm 6mm;text-align:center;
+  }
+  .receipt.w58{width:48mm}
+  .receipt.w80{width:72mm}
+  .rc-title{font-size:17px;font-weight:800;letter-spacing:1px}
+  .rc-sub{font-family:'Noto Serif CJK KR','Noto Serif KR','Batang',serif;font-size:12px;letter-spacing:4px;margin-top:1px}
+  .rc-hr{border:0;border-top:1px dashed #000;margin:7px 0}
+  .rc-info{font-size:12px;font-weight:700}
+  .rc-p{display:flex;gap:2px;margin:4px 0}
+  .rc-p div{flex:1;border:1px solid #000;padding:3px 0}
+  .rc-p small{display:block;font-size:10px}
+  .rc-p .h{font-family:'Noto Serif CJK KR','Noto Serif KR','Batang',serif;font-size:22px;font-weight:700;line-height:1.15}
+  .rc-p .k{font-size:10px}
+  .rc-sec{font-weight:800;margin:2px 0 1px;font-size:12px}
+  .rc-el{text-align:left;padding:0 3px;font-size:12px}
+  .rc-el span{display:inline-block;width:2.4em}
+  .rc-txt{font-size:12px;word-break:keep-all;text-align:left;padding:0 3px}
+  .rc-big{font-size:13px;font-weight:800;word-break:keep-all;margin:2px 0}
+  .rc-foot{font-size:10px;margin-top:4px}
+
+  @media print{
+    html,body{height:auto;overflow:visible;background:#fff!important;display:block}
+    body.printing > *:not(#print-root){display:none!important}
+    body.printing #print-root{display:block}
+    #print-root .receipt{margin:0 auto}
+  }
+</style>
+<style id="page-style">@page{size:58mm auto;margin:0}</style>
+</head>
+<body>
+
+<div class="warn">⚠ AI 사주는 참고용입니다. 재미로만 즐겨주세요!<small>For entertainment only · 오락 목적 서비스</small></div>
+
+<div id="shell">
+  <aside class="deco" id="deco-l" aria-hidden="true"></aside>
+
+  <main id="main">
+    <!-- 1) 입력 화면 -->
+    <section id="screen-input">
+      <div class="panel">
+        <div class="logo">✦</div>
+        <h1>AI 사주 체험</h1>
+        <p class="sub">생년월일, 출생지역, 성별만 알려주세요.<br>AI가 사주 한 장을 뽑아드립니다.</p>
+        <form class="form" id="form" autocomplete="off">
+          <div class="field">
+            <label for="birth">생년월일 (양력)</label>
+            <input type="date" id="birth" min="1900-01-01" required>
+          </div>
+          <div class="field">
+            <label for="region">출생지역</label>
+            <select id="region" required>
+              <option value="" disabled selected>지역을 선택하세요</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>성별</label>
+            <div class="seg" id="gender">
+              <button type="button" data-v="남">남성</button>
+              <button type="button" data-v="여">여성</button>
+            </div>
+          </div>
+          <div class="err" id="err"></div>
+          <button class="go" type="submit">사주 보기</button>
+        </form>
+        <div class="note">입력한 정보는 서버로 전송되지 않고, 이 기기에서만 계산돼요 · 태어난 시간은 입력받지 않아요</div>
+      </div>
+    </section>
+
+    <!-- 2) 채팅 화면 -->
+    <section id="screen-chat" hidden>
+      <div class="chat-head">
+        <div class="avatar">✦</div>
+        <div><b>AI 사주 도우미</b><span>● 풀이 중</span></div>
+      </div>
+      <div id="chat"></div>
+    </section>
+  </main>
+
+  <aside class="deco" id="deco-r" aria-hidden="true"></aside>
+</div>
+
+<div id="print-root"></div>
+<div id="modal" hidden>
+  <div class="sheet">
+    <img id="mimg" alt="내 사주 결과 이미지">
+    <p>📱 이미지를 길게 눌러 <b>‘사진에 저장’</b>하거나<br>아래 버튼으로 내려받으세요</p>
+    <div class="actions">
+      <a class="btn btn-main" id="dl" download="my-saju.png">⬇ 다운로드</a>
+      <button class="btn btn-ghost" id="mclose" type="button">닫기</button>
+    </div>
+  </div>
+</div>
+<div id="toast"></div>
+
+<script>
+// ==SAJU-CORE-START==
+const STEMS=['갑','을','병','정','무','기','경','신','임','계'];
+const STEMS_H=['甲','乙','丙','丁','戊','己','庚','辛','壬','癸'];
+const BR=['자','축','인','묘','진','사','오','미','신','유','술','해'];
+const BR_H=['子','丑','寅','卯','辰','巳','午','未','申','酉','戌','亥'];
+const EL=['목','화','토','금','수'];
+const EL_H=['木','火','土','金','水'];
+const stemEl=i=>[0,0,1,1,2,2,3,3,4,4][i];
+const brEl=i=>[4,2,0,0,2,1,1,2,3,3,2,4][i];
+const mod=(a,n)=>((a%n)+n)%n;
+
+// 태양 황경(도) — 해당 날짜 한국시간 정오 기준
+function sunLon(y,m,d){
+  const jd=Date.UTC(y,m-1,d,3,0,0)/86400000+2440587.5; // 12:00 KST = 03:00 UTC
+  const T=(jd-2451545.0)/36525, rad=Math.PI/180;
+  const L0=280.46646+36000.76983*T;
+  const M=(357.52911+35999.05029*T)*rad;
+  const C=(1.914602-0.004817*T)*Math.sin(M)+0.019993*Math.sin(2*M)+0.000289*Math.sin(3*M);
+  const om=(125.04-1934.136*T)*rad;
+  return mod(L0+C-0.00569-0.00478*Math.sin(om),360);
+}
+function calcSaju(y,m,d){
+  const lon=sunLon(y,m,d);
+  // 입춘(황경 315°) 이전이면 전년도 간지
+  const ya=(m<=2&&lon>=270&&lon<315)?y-1:y;
+  const ys=mod(ya-4,10), yb=mod(ya-4,12);
+  // 월주: 절기(입춘=315° 기준) 30° 단위
+  const mi=Math.floor(mod(lon-315,360)/30);
+  const mb=mod(2+mi,12);
+  const ms=mod(mod(ys,5)*2+2+mi,10);
+  // 일주
+  const jdn=Math.floor(Date.UTC(y,m-1,d)/86400000)+2440588;
+  const di=mod(jdn+49,60);
+  return {year:{s:ys,b:yb},month:{s:ms,b:mb},day:{s:di%10,b:di%12},lon};
+}
+// ==SAJU-CORE-END==
+
+/* ---------- 풀이 데이터 ---------- */
+const STEM_LONG=[
+ '큰 나무처럼 곧고 추진력 있는 리더형이에요. 한번 정하면 굽히지 않는 편입니다.',
+ '풀과 덩굴처럼 유연하고 적응력이 좋아요. 부드럽게 끝까지 해내는 힘이 있습니다.',
+ '태양처럼 밝고 열정적인 분위기 메이커예요. 숨기는 것 없이 솔직한 편입니다.',
+ '촛불처럼 따뜻하고 섬세한 사람이에요. 한 가지에 오래 집중하는 힘이 있습니다.',
+ '큰 산처럼 듬직하고 믿음직한 사람이에요. 속이 깊고 책임감이 강한 편입니다.',
+ '논밭처럼 포용력 있고 실속 있는 사람이에요. 조용히 챙기는 살림꾼 타입입니다.',
+ '바위와 쇠처럼 의리 있고 결단력 있는 사람이에요. 맺고 끊음이 분명한 편입니다.',
+ '보석처럼 예민하고 섬세한 완벽주의자예요. 감각과 안목이 좋은 편입니다.',
+ '큰 강과 바다처럼 스케일이 크고 지혜로워요. 생각이 깊고 자유로운 편입니다.',
+ '이슬과 빗물처럼 총명하고 감수성이 풍부해요. 조용히 스며드는 힘이 있습니다.'
+];
+const STEM_SHORT=['곧고 추진력 있는 큰 나무','유연하고 끈기 있는 풀꽃','밝고 열정적인 태양','따뜻하고 섬세한 촛불','듬직하고 믿음직한 큰 산','포용력 있는 실속파 논밭','의리와 결단력의 바위','예민하고 세련된 보석','스케일 큰 지혜의 강물','총명하고 감성 풍부한 이슬'];
+const YEAR_LONG={
+ '비겁':'동료와 경쟁자가 늘어나는 해예요. 협력하면 큰 힘이 되고, 고집은 줄일수록 좋아요.',
+ '식상':'표현력과 재능이 빛나는 해예요. 새로운 도전과 말·글·창작에 운이 따라요.',
+ '재성':'돈과 기회가 움직이는 해예요. 실속을 챙기되 욕심내면 흩어질 수 있어요.',
+ '관성':'책임과 평가가 따르는 해예요. 직장·시험·인연에 변화가 있고, 원칙을 지키면 인정받아요.',
+ '인성':'배움과 귀인의 해예요. 공부·자격·문서 운이 좋고, 차분히 준비하기 좋아요.'
+};
+const YEAR_SHORT={'비겁':'동료·경쟁이 느는 해','식상':'재능과 표현이 빛나는 해','재성':'돈과 기회가 움직이는 해','관성':'책임과 변화의 해','인성':'배움과 귀인의 해'};
+const ELX={
+ 0:{color:'초록색',nums:'3, 8',tip:'산책과 새로운 시작'},
+ 1:{color:'빨간색',nums:'2, 7',tip:'활동적인 움직임과 따뜻한 사람들'},
+ 2:{color:'노란색',nums:'5, 10',tip:'규칙적인 루틴과 안정'},
+ 3:{color:'흰색',nums:'4, 9',tip:'정리정돈과 결단'},
+ 4:{color:'검정·남색',nums:'1, 6',tip:'충분한 휴식과 배움'}
+};
+const REGIONS={ // 방위 오행 (재미용)
+ '서울':2,'인천':3,'경기':2,'강원':0,'충북':2,'충남':3,'대전':2,'세종':2,
+ '전북':3,'전남':3,'광주':3,'경북':0,'대구':0,'경남':1,'부산':1,'울산':0,'제주':4,'해외':4
+};
+const REGION_PLACE={0:'동쪽의 목(木) 기운',1:'남쪽의 화(火) 기운',2:'중앙의 토(土) 기운',3:'서쪽의 금(金) 기운',4:'물을 끼고 있는 수(水) 기운'};
+
+function relation(dayStem,yearStem){
+  const D=stemEl(dayStem), Y=stemEl(yearStem), d=mod(Y-D,5);
+  return ['비겁','식상','재성','인성','관성'][[0,1,2,4,3].indexOf(d)];
+}
+function analyze(y,m,d,gender,region){
+  const s=calcSaju(y,m,d);
+  const pillars=[s.year,s.month,s.day];
+  const cnt=[0,0,0,0,0];
+  pillars.forEach(p=>{cnt[stemEl(p.s)]++;cnt[brEl(p.b)]++;});
+  const max=Math.max(...cnt), min=Math.min(...cnt);
+  const strong=cnt.indexOf(max), weak=cnt.indexOf(min);
+  const dayStem=s.day.s;
+  const now=new Date();
+  const cur=calcSaju(now.getFullYear(),now.getMonth()+1,now.getDate()).year;
+  const rel=relation(dayStem,cur.s);
+  const forward=((s.year.s%2===0)===(gender==='남'));
+  return {s,pillars,cnt,strong,weak,dayStem,cur,rel,forward,region,gender,y,m,d,
+          placeEl:REGIONS[region]??2, nowY:now.getFullYear()};
+}
+const nm=p=>STEMS[p.s]+BR[p.b];
+const josa=(w,a,b)=>{const c=w.charCodeAt(w.length-1);return (c>=0xAC00&&c<=0xD7A3&&(c-0xAC00)%28)?a:b};
+
+/* ---------- 기본 세팅 ---------- */
+const $=s=>document.querySelector(s);
+const today=new Date();
+const pad2=n=>String(n).padStart(2,'0');
+const dstrNow=()=>`${today.getFullYear()}.${pad2(today.getMonth()+1)}.${pad2(today.getDate())}`;
+if(window.matchMedia&&matchMedia('(hover:hover) and (pointer:fine)').matches) document.body.classList.add('desk');
+
+function toast(msg){const t=$('#toast');t.textContent=msg;t.classList.add('on');clearTimeout(toast._t);toast._t=setTimeout(()=>t.classList.remove('on'),2200)}
+
+/* ---------- PC 좌우 장식 ---------- */
+(function deco(){
+  // 팔괘 + 태극 링
+  let tri='';
+  for(let i=0;i<8;i++){
+    let g='';
+    for(let k=0;k<3;k++){
+      const y=-(86-k*7), on=(i>>k)&1;
+      g+= on? `<rect x="-13" y="${y}" width="26" height="3.4" rx="1.4"/>`
+            : `<rect x="-13" y="${y}" width="11" height="3.4" rx="1.4"/><rect x="2" y="${y}" width="11" height="3.4" rx="1.4"/>`;
+    }
+    tri+=`<g transform="rotate(${i*45})" fill="#f5c76b">${g}</g>`;
+  }
+  const ring=`<svg class="ring" viewBox="-100 -100 200 200">
+    <circle r="96" fill="none" stroke="#f5c76b44" stroke-width="1"/>
+    <circle r="62" fill="none" stroke="#a78bfa55" stroke-width="1" stroke-dasharray="3 4"/>
+    ${tri}
+    <g><circle r="40" fill="#e9e6ff"/>
+    <path d="M0,-40 A40,40 0 0 1 0,40 A20,20 0 0 1 0,0 A20,20 0 0 0 0,-40" fill="#1b1f3f"/>
+    <circle cy="-20" r="6" fill="#1b1f3f"/><circle cy="20" r="6" fill="#e9e6ff"/></g></svg>`;
+  const chips=['木','火','土','金','水'].map((h,i)=>`<div class="chip" style="color:var(--${['wood','fire','earth','metal','water'][i]})">${h}</div>`).join('');
+  $('#deco-l').innerHTML=`${ring}<div class="chips">${chips}</div><div class="cap">五 行</div><div class="vt">四柱八字</div>`;
+
+  // 달 + 구름 + 별 + 다국어 문구
+  const moon=`<svg class="moon" viewBox="-60 -60 120 120">
+    <defs><radialGradient id="mg" cx="40%" cy="38%"><stop offset="0" stop-color="#fffbe8"/><stop offset="1" stop-color="#ffd978"/></radialGradient></defs>
+    <circle r="46" fill="url(#mg)"/>
+    <circle cx="-14" cy="-10" r="8" fill="#f1c85c" opacity=".55"/><circle cx="14" cy="16" r="11" fill="#f1c85c" opacity=".4"/>
+    <circle cx="18" cy="-20" r="5" fill="#f1c85c" opacity=".5"/></svg>`;
+  let stars='';
+  for(let i=0;i<22;i++) stars+=`<i class="star" style="left:${Math.random()*100}%;top:${Math.random()*100}%;animation-delay:${(Math.random()*3).toFixed(2)}s;opacity:${(.4+Math.random()*.6).toFixed(2)}"></i>`;
+  $('#deco-r').innerHTML=`${stars}<i class="cloud c1"></i><i class="cloud c2"></i><i class="cloud c3"></i>
+    ${moon}
+    <div class="phrase" id="phrase"><small id="plang"></small><div id="ptext"></div></div>
+    <div class="vt">運命</div>`;
+  const P=[['한국어','AI 사주는 참고용이에요.\n재미로만 즐겨주세요!'],
+           ['English','Just for fun —\nnot a prediction.'],
+           ['日本語','遊び心で楽しんでね。\n占いは参考程度に。'],
+           ['中文','命运仅供娱乐参考，\n开心最重要。'],
+           ['Español','Solo por diversión,\nno es una predicción.']];
+  let pi=0;
+  const show=()=>{const e=$('#phrase');if(!e)return;e.classList.add('out');
+    setTimeout(()=>{$('#plang').textContent=P[pi][0];$('#ptext').textContent=P[pi][1];$('#ptext').style.whiteSpace='pre-line';e.classList.remove('out');pi=(pi+1)%P.length},500)};
+  show();setInterval(show,3800);
+})();
+
+/* ---------- 입력 ---------- */
+const sel=$('#region');
+Object.keys(REGIONS).forEach(r=>{const o=document.createElement('option');o.value=r;o.textContent=r;sel.appendChild(o)});
+$('#birth').max=today.toISOString().slice(0,10);
+let gender='', paper=58, autoPrint=false, lastA=null, lastBlob=null, lastURL=null;
+document.querySelectorAll('#gender button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('#gender button').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on');gender=b.dataset.v;
+});
+$('#form').onsubmit=e=>{
+  e.preventDefault();
+  const v=$('#birth').value, r=sel.value;
+  if(!v) return $('#err').textContent='생년월일을 입력해주세요.';
+  if(!r) return $('#err').textContent='출생지역을 선택해주세요.';
+  if(!gender) return $('#err').textContent='성별을 선택해주세요.';
+  const [y,m,d]=v.split('-').map(Number);
+  if(y<1900) return $('#err').textContent='1900년 이후만 가능해요.';
+  $('#err').textContent='';
+  startChat(analyze(y,m,d,gender,r));
+};
+
+/* ---------- 채팅 ---------- */
+const chat=$('#chat');
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const toBottom=()=>{chat.scrollTop=chat.scrollHeight};
+let skip=false;
+
+function addRow(me,html){
+  const row=document.createElement('div');row.className='row'+(me?' me':'');
+  row.innerHTML=(me?'':'<div class="avatar">✦</div>')+'<div class="bubble">'+(html||'')+'</div>';
+  chat.appendChild(row);toBottom();return row.querySelector('.bubble');
+}
+async function say(text,extraHTML){
+  const b=addRow(false,'<span class="dots"><i></i><i></i><i></i></span>');
+  await sleep(skip?0:450);
+  b.classList.add('cursor');b.textContent='';
+  for(let i=0;i<text.length;i+=2){
+    b.textContent=text.slice(0,i+2);toBottom();
+    if(!skip) await sleep(12);
+  }
+  b.classList.remove('cursor');
+  if(extraHTML){b.insertAdjacentHTML('beforeend',extraHTML);toBottom();}
+  await sleep(skip?0:250);
+}
+function miniPillars(a){
+  const names=['년주','월주','일주'];
+  return '<div class="mini">'+a.pillars.map((p,i)=>
+   `<div><small>${names[i]}</small><span class="h">${STEMS_H[p.s]}<br>${BR_H[p.b]}</span><span class="k">${nm(p)}</span></div>`).join('')+'</div>';
+}
+function bars(cnt){return cnt.map((c,i)=>`${EL[i]}(${EL_H[i]}) ${'■'.repeat(c)}${'□'.repeat(Math.max(0,4-c))} ${c}`).join('\n')}
+function summary(a){
+  const dayK=STEMS[a.dayStem]+EL[stemEl(a.dayStem)];
+  const lack=a.cnt[a.weak]===0;
+  let t=`${dayK}${josa(dayK,'이','가')} 중심인 사주, ${EL[a.strong]} 기운이 강해요. `;
+  t+= lack?`${EL[a.weak]} 기운이 비어 있어 ${ELX[a.weak].tip}으로 채우면 좋아요.`
+          :`${EL[a.weak]} 기운이 약하니 ${ELX[a.weak].tip}으로 균형을 잡아보세요.`;
+  return t;
+}
+function summaryShort(a){
+  return `${EL[a.strong]} 기운이 강하고 ${EL[a.weak]} 기운이 약한 사주. ${ELX[a.weak].tip}으로 균형을!`;
+}
+
+async function startChat(a){
+  lastA=a;
+  $('#screen-input').hidden=true;$('#screen-chat').hidden=false;
+  chat.innerHTML='';skip=false;
+  chat.onclick=()=>{skip=true};
+  const imgReady=buildImage(a).catch(()=>null); // 대화 중 미리 이미지 생성
+  addRow(true,`${a.y}년 ${a.m}월 ${a.d}일생 · ${a.gender}성 · ${a.region}`);
+  await sleep(500);
+  await say('안녕하세요! 입력해주신 정보로 사주를 풀어볼게요. 잠시만 기다려주세요…');
+  await say('만세력을 계산하는 중이에요.\n절기와 날짜를 기준으로 년·월·일의 기둥을 세웁니다.');
+  await say('사주의 세 기둥이 세워졌어요.',miniPillars(a));
+  await say(`오행 분포를 볼게요.\n\n${bars(a.cnt)}\n\n${EL[a.strong]} 기운이 가장 강하고, ${EL[a.weak]} 기운이 ${a.cnt[a.weak]===0?'비어 있어요':'가장 약해요'}.`);
+  await say(`나를 나타내는 일간은 ${STEMS[a.dayStem]}${EL[stemEl(a.dayStem)]}(${STEMS_H[a.dayStem]}).\n${STEM_LONG[a.dayStem]}`);
+  await say(`올해 ${a.nowY}년은 ${nm(a.cur)}년이에요.\n${YEAR_LONG[a.rel]}`);
+  await say(`태어난 곳 ${a.region}은(는) ${REGION_PLACE[a.placeEl]}의 터예요.\n큰 흐름(대운)은 ${a.forward?'순행, 앞으로 차근차근 나아가는':'역행, 한 번 돌아보고 다지며 나아가는'} 방향이에요.\n부족한 기운을 채워줄 행운의 색은 ${ELX[a.weak].color}, 숫자는 ${ELX[a.weak].nums}입니다.`);
+  await say(`한 줄 요약\n"${summary(a)}"`);
+  await say('사주 종이가 완성됐어요. 이미지로 저장해서 친구에게도 보여주세요!');
+  await imgReady;
+  showResult(a);
+}
+
+/* ---------- 결과 이미지 (캔버스) ---------- */
+function wrapText(ctx,text,maxW){
+  const lines=[];let line='';
+  for(const word of text.split(' ')){
+    const t=line?line+' '+word:word;
+    if(ctx.measureText(t).width<=maxW){line=t;continue}
+    if(line) lines.push(line);
+    if(ctx.measureText(word).width<=maxW){line=word;continue}
+    line='';
+    for(const ch of word){ if(ctx.measureText(line+ch).width>maxW&&line){lines.push(line);line=ch}else line+=ch }
+  }
+  if(line) lines.push(line);
+  return lines;
+}
+const SANS=(s,w=400)=>`${w} ${s}px 'Apple SD Gothic Neo','Malgun Gothic','Noto Sans KR',sans-serif`;
+const SERIF=(s,w=700)=>`${w} ${s}px 'Noto Serif CJK KR','Noto Serif KR','Batang','Songti SC','Noto Serif CJK SC',serif`;
+
+function drawSaju(ctx,a,ox,oy,w){
+  const cx=ox+w/2, inner=16, L=ox+inner, R=ox+w-inner, iw=w-inner*2;
+  let y=oy+34;
+  ctx.fillStyle='#111';ctx.strokeStyle='#111';ctx.textAlign='center';ctx.textBaseline='alphabetic';
+  const T=(txt,font,yy,x=cx)=>{ctx.font=font;ctx.fillText(txt,x,yy)};
+  const dash=()=>{y+=10;ctx.save();ctx.lineWidth=1;ctx.setLineDash([4,3]);ctx.beginPath();ctx.moveTo(L,y);ctx.lineTo(R,y);ctx.stroke();ctx.restore();y+=20};
+  const para=(txt,font,lh)=>{ctx.font=font;wrapText(ctx,txt,iw).forEach(l=>{ctx.fillText(l,cx,y);y+=lh})};
+
+  T('AI 사주',SANS(28,800),y);y+=22;
+  if('letterSpacing' in ctx) ctx.letterSpacing='6px';
+  T('四柱八字',SERIF(14,400),y);
+  if('letterSpacing' in ctx) ctx.letterSpacing='0px';
+  y+=6;dash();
+
+  T(`${a.y}.${pad2(a.m)}.${pad2(a.d)} · ${a.gender} · ${a.region}`,SANS(15,700),y);y+=14;
+
+  const names=['년주','월주','일주'], bw=(iw-16)/3, bh=122;
+  y+=6;
+  a.pillars.forEach((p,i)=>{
+    const bx=L+i*(bw+8), mx=bx+bw/2;
+    ctx.lineWidth=1.5;ctx.strokeRect(bx,y,bw,bh);
+    T(names[i],SANS(11),y+17,mx);
+    T(STEMS_H[p.s],SERIF(36),y+56,mx);
+    T(BR_H[p.b],SERIF(36),y+94,mx);
+    T(nm(p),SANS(12),y+113,mx);
+  });
+  y+=bh+4;dash();
+
+  T('오행',SANS(14,800),y);y+=22;
+  ctx.textAlign='left';
+  a.cnt.forEach((c,i)=>{
+    ctx.font=SANS(14);ctx.fillText(`${EL_H[i]} ${EL[i]}`,L+22,y);
+    const n=Math.max(4,c);
+    for(let k=0;k<n;k++){
+      const bx=L+88+k*18;
+      if(k<c) ctx.fillRect(bx,y-11,13,13); else {ctx.lineWidth=1.2;ctx.strokeRect(bx+.5,y-10.5,12,12)}
+    }
+    ctx.fillText(String(c),L+88+n*18+6,y);
+    y+=23;
+  });
+  ctx.textAlign='center';
+  y-=6;dash();
+
+  T(`나의 일간 ${STEMS_H[a.dayStem]}${STEMS[a.dayStem]}`,SANS(14,800),y);y+=21;
+  para(STEM_SHORT[a.dayStem],SANS(14),20);y+=10;
+  T(`올해 ${nm(a.cur)}년`,SANS(14,800),y);y+=21;
+  para(YEAR_SHORT[a.rel],SANS(14),20);y+=10;
+  T('행운',SANS(14,800),y);y+=21;
+  para(`색 ${ELX[a.weak].color} / 숫자 ${ELX[a.weak].nums}`,SANS(14),20);
+  dash();
+
+  para(summaryShort(a),SANS(15,800),23);
+  dash();
+
+  T('재미로 보는 AI 사주 체험',SANS(11),y);y+=16;
+  T(dstrNow(),SANS(11),y);y+=14;
+  return y-oy;
+}
+
+async function buildImage(a){
+  if(document.fonts&&document.fonts.ready) await document.fonts.ready;
+  const S=2,W=360,PAD=22,PW=W-PAD*2,TOOTH=8;
+  const probe=document.createElement('canvas');probe.width=W*S;probe.height=2400*S;
+  const pc=probe.getContext('2d');pc.scale(S,S);
+  const ch=drawSaju(pc,a,0,0,PW);
+  const H=Math.ceil(PAD+TOOTH+ch+TOOTH+PAD);
+  const cv=document.createElement('canvas');cv.width=W*S;cv.height=H*S;
+  const c=cv.getContext('2d');c.scale(S,S);
+  const g=c.createLinearGradient(0,0,0,H);g.addColorStop(0,'#1b1f3f');g.addColorStop(1,'#0f1226');
+  c.fillStyle=g;c.fillRect(0,0,W,H);
+  // 영수증 종이(톱니 가장자리)
+  const top=PAD, bot=H-PAD, n=40, tw=PW/n;
+  c.save();c.shadowColor='#0009';c.shadowBlur=18;c.shadowOffsetY=6;
+  c.beginPath();c.moveTo(PAD,top+TOOTH);
+  for(let i=0;i<n;i++){c.lineTo(PAD+i*tw+tw/2,top);c.lineTo(PAD+(i+1)*tw,top+TOOTH)}
+  c.lineTo(PAD+PW,bot-TOOTH);
+  for(let i=n;i>0;i--){c.lineTo(PAD+i*tw-tw/2,bot);c.lineTo(PAD+(i-1)*tw,bot-TOOTH)}
+  c.closePath();c.fillStyle='#fffdf7';c.fill();c.restore();
+  drawSaju(c,a,PAD,top+TOOTH,PW);
+  const blob=await new Promise(r=>cv.toBlob(r,'image/png'));
+  if(!blob) throw new Error('이미지 생성 실패');
+  if(lastURL) URL.revokeObjectURL(lastURL);
+  lastBlob=blob;lastURL=URL.createObjectURL(blob);
+  return lastURL;
+}
+
+/* ---------- 결과 화면 ---------- */
+function showResult(a){
+  const row=document.createElement('div');row.className='row';row.style.justifyContent='center';
+  row.innerHTML=`<div class="result-box">
+    ${lastURL?`<img class="result-img" id="rimg" src="${lastURL}" alt="내 사주 결과">`:'<div class="bubble">이미지를 만들지 못했어요. 새로고침 후 다시 시도해주세요.</div>'}
+    <div class="actions">
+      <button class="btn btn-main" id="btnSave" type="button">📸 이미지 저장</button>
+      <button class="btn btn-sub" id="btnShare" type="button">📤 공유하기</button>
+    </div>
+    <div class="actions">
+      <button class="btn btn-ghost desk-only" id="btnPrint" type="button">🧾 인쇄</button>
+      <button class="btn btn-ghost" id="btnAgain" type="button">↻ 다시 하기</button>
+    </div>
+    <div class="opts desk-only">
+      <label style="display:inline;margin:0">용지폭 <select id="paper"><option value="58">58mm</option><option value="80">80mm</option></select></label>
+      <label style="display:inline;margin:0"><input type="checkbox" id="auto"> 결과 나오면 자동 인쇄</label>
+    </div>
+    <div class="hint">※ AI 사주는 참고용입니다. 재미로만 즐겨주세요 ✦</div>
+  </div>`;
+  chat.appendChild(row);toBottom();
+  $('#paper').value=String(paper);$('#auto').checked=autoPrint;
+  $('#paper').onchange=e=>{paper=+e.target.value};
+  $('#auto').onchange=e=>{autoPrint=e.target.checked};
+  $('#btnSave').onclick=saveImage;
+  $('#btnShare').onclick=shareResult;
+  $('#btnPrint').onclick=printReceipt;
+  $('#btnAgain').onclick=()=>{
+    $('#screen-chat').hidden=true;$('#screen-input').hidden=false;
+    $('#form').reset();gender='';
+    document.querySelectorAll('#gender button').forEach(x=>x.classList.remove('on'));
+    $('#main').scrollTop=0;
+  };
+  if(autoPrint&&document.body.classList.contains('desk')) setTimeout(printReceipt,500);
+}
+function saveImage(){
+  if(!lastURL) return toast('이미지가 아직 없어요');
+  $('#mimg').src=lastURL;$('#dl').href=lastURL;$('#modal').hidden=false;
+}
+$('#mclose').onclick=()=>{$('#modal').hidden=true};
+$('#modal').onclick=e=>{if(e.target.id==='modal')$('#modal').hidden=true};
+async function shareResult(){
+  const title='AI 사주 체험', text='내 사주 한 장! (재미로 보는 AI 사주)';
+  try{
+    if(lastBlob){
+      const file=new File([lastBlob],'my-saju.png',{type:'image/png'});
+      if(navigator.canShare&&navigator.canShare({files:[file]})){
+        await navigator.share({files:[file],title,text});return;
+      }
+    }
+    if(navigator.share){await navigator.share({title,text,url:location.href});return}
+    if(navigator.clipboard){await navigator.clipboard.writeText(location.href);toast('링크를 복사했어요');return}
+    toast('이미지 저장 후 직접 공유해주세요');
+  }catch(e){ if(e&&e.name!=='AbortError') toast('공유할 수 없어요. 이미지 저장을 이용해주세요') }
+}
+
+/* ---------- 영수증 프린터 출력 ---------- */
+function receiptHTML(a,cls){
+  const names=['년주','월주','일주'];
+  const ps=a.pillars.map((p,i)=>`<div><small>${names[i]}</small><span class="h">${STEMS_H[p.s]}<br>${BR_H[p.b]}</span><span class="k">${nm(p)}</span></div>`).join('');
+  const el=a.cnt.map((c,i)=>`<div><span>${EL_H[i]}${EL[i]}</span>${'■'.repeat(c)}${'□'.repeat(Math.max(0,4-c))} ${c}</div>`).join('');
+  return `<div class="receipt ${cls}">
+    <div class="rc-title">AI 사주</div>
+    <div class="rc-sub">四柱八字</div>
+    <hr class="rc-hr">
+    <div class="rc-info">${a.y}.${pad2(a.m)}.${pad2(a.d)} · ${a.gender} · ${a.region}</div>
+    <div class="rc-p">${ps}</div>
+    <hr class="rc-hr">
+    <div class="rc-sec">오행</div>
+    <div class="rc-el">${el}</div>
+    <hr class="rc-hr">
+    <div class="rc-sec">나의 일간 ${STEMS_H[a.dayStem]}${STEMS[a.dayStem]}</div>
+    <div class="rc-txt">${STEM_SHORT[a.dayStem]}</div>
+    <div class="rc-sec" style="margin-top:5px">올해 ${nm(a.cur)}년</div>
+    <div class="rc-txt">${YEAR_SHORT[a.rel]}</div>
+    <div class="rc-sec" style="margin-top:5px">행운</div>
+    <div class="rc-txt">색 ${ELX[a.weak].color} / 숫자 ${ELX[a.weak].nums}</div>
+    <hr class="rc-hr">
+    <div class="rc-big">${summaryShort(a)}</div>
+    <hr class="rc-hr">
+    <div class="rc-foot">AI 사주는 참고용, 재미로만 즐기세요<br>${dstrNow()}</div>
+  </div>`;
+}
+function printReceipt(){
+  if(!lastA) return;
+  $('#print-root').innerHTML=receiptHTML(lastA,'w'+paper);
+  $('#page-style').textContent=`@page{size:${paper}mm auto;margin:0}`;
+  document.body.classList.add('printing');
+  window.print();
+}
+window.addEventListener('afterprint',()=>document.body.classList.remove('printing'));
+</script>
+</body>
+</html>
